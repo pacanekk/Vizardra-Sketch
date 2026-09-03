@@ -161,8 +161,8 @@ impl AppState {
             p.clone()
         } else {
             let file = rfd::FileDialog::new()
-                .add_filter("Vizardra", &["vizardra"])
-                .set_file_name("untitled.vizardra")
+                .add_filter("Vizardra", &["vzd"])
+                .set_file_name("untitled.vzd")
                 .save_file();
 
             match file {
@@ -186,7 +186,7 @@ impl AppState {
 
     fn open_project(&mut self) -> Task<Message> {
         let file = rfd::FileDialog::new()
-            .add_filter("Vizardra", &["vizardra"])
+            .add_filter("Vizardra", &["vzd"])
             .pick_file();
 
         if let Some(path) = file {
