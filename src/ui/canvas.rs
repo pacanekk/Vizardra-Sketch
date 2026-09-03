@@ -1,5 +1,6 @@
 use iced::mouse;
 use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke, Text};
+use iced::widget::Action;
 use iced::{Color, Element, Point, Rectangle, Size, Vector};
 
 use crate::core::document::Document;
@@ -141,49 +142,45 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
     fn update(
         &self,
         state: &mut InteractionState,
-        event: canvas::Event,
+        event: &canvas::Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
-    ) -> (canvas::event::Status, Option<CanvasEvent>) {
+    ) -> Option<Action<CanvasEvent>> {
         let cursor_pos = cursor.position_in(bounds);
         let modifiers = state.last_modifiers;
 
         match event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(button)) => {
                 if let Some(pos) = cursor_pos {
-                    return (
-                        canvas::event::Status::Captured,
-                        Some(CanvasEvent::Pressed { pos, button }),
+                    return Some(
+                        Action::publish(CanvasEvent::Pressed { pos, button: *button })
+                            .and_capture(),
                     );
                 }
             }
             canvas::Event::Mouse(mouse::Event::ButtonReleased(button)) => {
                 if let Some(pos) = cursor_pos {
-                    return (
-                        canvas::event::Status::Captured,
-                        Some(CanvasEvent::Released { pos, button }),
+                    return Some(
+                        Action::publish(CanvasEvent::Released { pos, button: *button })
+                            .and_capture(),
                     );
                 }
             }
             canvas::Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 if let Some(pos) = cursor_pos {
-                    return (
-                        canvas::event::Status::Ignored,
-                        Some(CanvasEvent::Moved(pos)),
-                    );
+                    return Some(Action::publish(CanvasEvent::Moved(pos)));
                 }
             }
             canvas::Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
                 if let Some(pos) = cursor_pos {
                     let scroll_delta = match delta {
-                        mouse::ScrollDelta::Pixels { x, y } => Vector::new(x, y),
+                        mouse::ScrollDelta::Pixels { x, y } => Vector::new(*x, *y),
                         mouse::ScrollDelta::Lines { x, y } => {
-                            Vector::new(x * 20.0, y * 20.0)
+                            Vector::new(*x * 20.0, *y * 20.0)
                         }
                     };
-                    return (
-                        canvas::event::Status::Captured,
-                        Some(CanvasEvent::Scrolled {
+                    return Some(
+                        Action::publish(CanvasEvent::Scrolled {
                             delta: scroll_delta,
                             modifiers: Modifiers {
                                 alt: modifiers.alt,
@@ -191,7 +188,8 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
                                 shift: modifiers.shift,
                             },
                             cursor_pos: pos,
-                        }),
+                        })
+                        .and_capture(),
                     );
                 }
             }
@@ -205,7 +203,7 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
             _ => {}
         }
 
-        (canvas::event::Status::Ignored, None)
+        None
     }
 
     fn draw(
@@ -342,8 +340,8 @@ fn draw_object(frame: &mut Frame, obj: &ObjectData, zoom: f32, pan_x: f32, pan_y
                 position: Point::new(x + w / 2.0, y + h / 2.0),
                 color: Color::from_rgb(0.353, 0.353, 0.376),
                 size: iced::Pixels(12.0),
-                horizontal_alignment: iced::alignment::Horizontal::Center,
-                vertical_alignment: iced::alignment::Vertical::Center,
+                align_x: iced::alignment::Horizontal::Center.into(),
+                align_y: iced::alignment::Vertical::Center.into(),
                 ..Default::default()
             };
             frame.fill_text(text);

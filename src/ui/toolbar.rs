@@ -15,7 +15,7 @@ pub enum ToolbarMessage {
     Export,
 }
 
-pub fn view(active_tool: &str, can_undo: bool, can_redo: bool) -> Element<'static, ToolbarMessage> {
+pub fn view(active_tool: &str, _can_undo: bool, _can_redo: bool) -> Element<'static, ToolbarMessage> {
     let tools = row![
         tool_button_svg("assets/icons/select.svg", "Select", active_tool == "select", ToolbarMessage::ToolSelected("select".into())),
         tool_button("R", "Rectangle", active_tool == "rectangle", ToolbarMessage::ToolSelected("rectangle".into())),
@@ -26,23 +26,9 @@ pub fn view(active_tool: &str, can_undo: bool, can_redo: bool) -> Element<'stati
     .spacing(2)
     .padding([0, 12]);
 
-    let file_ops = row![
-        text_button("New", ToolbarMessage::NewProject, false),
-        text_button("Open", ToolbarMessage::OpenProject, false),
-        text_button("Save", ToolbarMessage::SaveProject, false),
-        text_button("Export", ToolbarMessage::Export, false),
-    ]
-    .spacing(4);
-
-    let history = row![
-        text_button("Undo", ToolbarMessage::Undo, !can_undo),
-        text_button("Redo", ToolbarMessage::Redo, !can_redo),
-    ]
-    .spacing(4);
-
     let content = row![
         tools,
-        container(row![file_ops, history].spacing(16))
+        container(row![].spacing(16))
             .width(Length::Fill)
             .align_x(alignment::Horizontal::Center)
     ]
@@ -121,34 +107,4 @@ fn tool_button_svg(path: &str, label: &str, active: bool, on_press: ToolbarMessa
     })
     .on_press(on_press)
     .into()
-}
-
-fn text_button(label: &str, on_press: ToolbarMessage, disabled: bool) -> button::Button<'static, ToolbarMessage> {
-    let btn = button(
-        text(label.to_string())
-            .size(12)
-            .color(Theme::text_secondary())
-            .align_x(alignment::Horizontal::Center),
-    )
-    .padding([6, 12])
-    .style(|_theme, status| {
-        let hovered = matches!(status, button::Status::Hovered);
-        button::Style {
-            background: Some(iced::Background::Color(
-                if hovered { Theme::bg_hover() } else { Theme::bg_panel_alt() }
-            )),
-            border: iced::Border {
-                color: Theme::border_subtle(),
-                width: 1.0,
-                radius: 3.0.into(),
-            },
-            ..Default::default()
-        }
-    });
-
-    if disabled {
-        btn
-    } else {
-        btn.on_press(on_press)
-    }
 }

@@ -1,4 +1,4 @@
-use iced::widget::{button, container, row, text};
+use iced::widget::{button, container, row, svg, text};
 use iced::{Element, Length};
 use iced::alignment;
 
@@ -12,6 +12,14 @@ pub enum StatusBarMessage {
 }
 
 pub fn view(status_text: &str, doc_size: &str, zoom_text: &str) -> Element<'static, StatusBarMessage> {
+    let reset_handle = svg::Handle::from_path("assets/icons/zoom-reset.svg");
+    let reset_icon = svg(reset_handle)
+        .width(Length::Fixed(12.0))
+        .height(Length::Fixed(12.0))
+        .style(move |_theme, _status| svg::Style {
+            color: Some(Theme::text_secondary()),
+        });
+
     let content = row![
         text(status_text.to_string()).size(11).color(Theme::text_secondary()),
         container(
@@ -21,7 +29,13 @@ pub fn view(status_text: &str, doc_size: &str, zoom_text: &str) -> Element<'stat
             zoom_btn("−", StatusBarMessage::ZoomOut),
             text(zoom_text.to_string()).size(11).color(Theme::text_secondary()).width(48).align_x(alignment::Horizontal::Center),
             zoom_btn("+", StatusBarMessage::ZoomIn),
-            zoom_btn("⤢", StatusBarMessage::ZoomReset),
+            button(reset_icon)
+                .padding([4, 6])
+                .style(|_theme, _status| button::Style {
+                    background: Some(iced::Background::Color(iced::Color::TRANSPARENT)),
+                    ..Default::default()
+                })
+                .on_press(StatusBarMessage::ZoomReset),
         ]
         .spacing(4)
         .align_y(alignment::Vertical::Center),

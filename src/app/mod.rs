@@ -30,6 +30,7 @@ pub struct AppState {
     pub doc_size: String,
     pub needs_fit: bool,
     pub editing_layer_id: Option<String>,
+    pub window_size: (f32, f32),
 }
 
 impl Default for AppState {
@@ -49,6 +50,7 @@ impl Default for AppState {
             doc_size: "1920 × 1080".to_string(),
             needs_fit: true,
             editing_layer_id: None,
+            window_size: (1280.0, 800.0),
         }
     }
 }
@@ -56,6 +58,7 @@ impl Default for AppState {
 #[derive(Debug, Clone)]
 pub enum Message {
     Toolbar(ToolbarMessage),
+    MenuBar(crate::ui::menu_bar::MenuBarMessage),
     Canvas(CanvasEvent),
     Layers(LayersMessage),
     Properties(PropertiesMessage),
@@ -64,8 +67,9 @@ pub enum Message {
 }
 
 pub fn run() -> Result<(), iced::Error> {
-    iced::application("Vizardra", AppState::update, AppState::view)
-        .theme(|_state| Theme::Dark)
+    iced::application(AppState::default, AppState::update, AppState::view)
+        .title(|_state: &AppState| String::from("Vizardra"))
+        .theme(|_state: &AppState| Theme::Dark)
         .subscription(AppState::subscription)
         .window_size((1280.0, 800.0))
         .run()
@@ -80,8 +84,8 @@ fn measure_text(content: &str, font_size: f32) -> (f32, f32) {
         size: iced::Pixels(font_size),
         line_height: iced::advanced::text::LineHeight::default(),
         font: iced::Font::default(),
-        horizontal_alignment: iced::alignment::Horizontal::Left,
-        vertical_alignment: iced::alignment::Vertical::Top,
+        align_x: iced::alignment::Horizontal::Left.into(),
+        align_y: iced::alignment::Vertical::Top.into(),
         shaping: iced::advanced::text::Shaping::Basic,
         wrapping: iced::advanced::text::Wrapping::None,
     };
@@ -523,12 +527,7 @@ impl AppState {
     }
 
     fn zoom_reset(&mut self) {
-        self.canvas.zoom = 1.0;
-        let doc_w = self.document.width as f32;
-        let doc_h = self.document.height as f32;
-        self.canvas.pan_x = -doc_w / 2.0;
-        self.canvas.pan_y = -doc_h / 2.0;
-        self.zoom_text = format_zoom(self.canvas.zoom);
+        self.fit_to_screen(self.window_size.0, self.window_size.1);
     }
 
     fn fit_to_screen(&mut self, window_w: f32, window_h: f32) {
@@ -611,6 +610,31 @@ impl AppState {
                         return task;
                     }
                     ToolbarMessage::Export => self.export(),
+                }
+                Task::none()
+            }
+            Message::MenuBar(msg) => {
+                match msg {
+                    crate::ui::menu_bar::MenuBarMessage::NewProject => {
+                        self.new_project();
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::OpenProject => {
+                        let task = self.open_project();
+                        return task;
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::SaveProject => {
+                        let task = self.save_project();
+                        return task;
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::Export => {
+                        self.export();
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::Undo => {
+                        self.undo();
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::Redo => {
+                        self.redo();
+                    }
                 }
                 Task::none()
             }
@@ -773,6 +797,7 @@ impl AppState {
                 Task::none()
             }
             Message::WindowResized(size) => {
+                self.window_size = (size.width, size.height);
                 if self.needs_fit {
                     self.fit_to_screen(size.width, size.height);
                     self.needs_fit = false;
@@ -783,6 +808,9 @@ impl AppState {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        let menu_bar = crate::ui::menu_bar::view(self.can_undo(), self.can_redo())
+            .map(Message::MenuBar);
+
         let toolbar = crate::ui::toolbar::view(&self.active_tool, self.can_undo(), self.can_redo())
             .map(Message::Toolbar);
 
@@ -808,7 +836,7 @@ impl AppState {
             .width(Length::Fill)
             .height(Length::Fill);
 
-        column![toolbar, main, status_bar]
+        column![menu_bar, toolbar, main, status_bar]
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
