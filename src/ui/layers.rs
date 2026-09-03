@@ -7,6 +7,7 @@ use crate::ui::theme::Theme;
 
 #[derive(Clone, Debug)]
 pub enum LayersMessage {
+    LayerSelected(String),
     LayerDoubleClicked(String),
     LayerNameChanged(String, String),
     LayerNameSubmitted,
@@ -59,12 +60,11 @@ pub fn view<'a>(
         let bg = if is_selected { Theme::bg_selected() } else { Color::TRANSPARENT };
 
         let layer_btn = if is_editing {
-            let name_for_input = name.clone();
             let id_for_input = id.clone();
             button(
                 row![
                     text(icon.to_string()).size(12).color(Theme::accent()),
-                    text_input("", &name_for_input)
+                    text_input("", &name)
                         .size(12)
                         .on_input(move |s| LayersMessage::LayerNameChanged(id_for_input.clone(), s))
                         .on_submit(LayersMessage::LayerNameSubmitted)
@@ -86,12 +86,36 @@ pub fn view<'a>(
                 ..Default::default()
             })
             .on_press(LayersMessage::LayerNameSubmitted)
-        } else {
-            let id_for_double = id.clone();
+        } else if is_selected {
+            let id_for_edit = id.clone();
             button(
                 row![
                     text(icon.to_string()).size(12).color(Theme::accent()),
-                    text(name).size(12).color(if is_selected { Theme::text_primary() } else { Theme::text_secondary() }),
+                    text(name).size(12).color(Theme::text_primary()),
+                    vis_btn,
+                    text("✎").size(11).color(Theme::text_tertiary()),
+                ]
+                .spacing(8)
+                .align_y(alignment::Vertical::Center),
+            )
+            .padding([6, 8])
+            .width(Length::Fill)
+            .style(move |_theme, _status| button::Style {
+                background: Some(iced::Background::Color(bg)),
+                border: iced::Border {
+                    color: Theme::accent_dim(),
+                    width: 1.0,
+                    radius: 3.0.into(),
+                },
+                ..Default::default()
+            })
+            .on_press(LayersMessage::LayerDoubleClicked(id_for_edit))
+        } else {
+            let id_for_select = id.clone();
+            button(
+                row![
+                    text(icon.to_string()).size(12).color(Theme::accent()),
+                    text(name).size(12).color(Theme::text_secondary()),
                     vis_btn,
                 ]
                 .spacing(8)
@@ -102,13 +126,13 @@ pub fn view<'a>(
             .style(move |_theme, _status| button::Style {
                 background: Some(iced::Background::Color(bg)),
                 border: iced::Border {
-                    color: if is_selected { Theme::accent_dim() } else { Color::TRANSPARENT },
-                    width: if is_selected { 1.0 } else { 0.0 },
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
                     radius: 3.0.into(),
                 },
                 ..Default::default()
             })
-            .on_press(LayersMessage::LayerDoubleClicked(id_for_double))
+            .on_press(LayersMessage::LayerSelected(id_for_select))
         };
 
         layers = layers.push(layer_btn);

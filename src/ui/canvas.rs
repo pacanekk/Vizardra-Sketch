@@ -38,6 +38,7 @@ pub struct CanvasState {
     pub pan_start_pan: (f32, f32),
     pub is_drawing_path: bool,
     pub drag_points_start: Vec<crate::core::object::PathPoint>,
+    pub smoothing: f32,
 }
 
 impl Default for CanvasState {
@@ -57,6 +58,7 @@ impl Default for CanvasState {
             pan_start_pan: (0.0, 0.0),
             is_drawing_path: false,
             drag_points_start: Vec::new(),
+            smoothing: 0.5,
         }
     }
 }
@@ -247,19 +249,13 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
             Stroke::default().with_width(1.0).with_color(Theme::doc_border()),
         );
 
-        // Draw objects (clipped to document area)
-        let doc_bounds = Rectangle::new(Point::new(doc_x, doc_y), Size::new(doc_w, doc_h));
-        let cs_zoom = cs.zoom;
-        let doc_x_clip = doc_x;
-        let doc_y_clip = doc_y;
-        frame.with_clip(doc_bounds, |frame| {
-            for obj in &doc.objects {
-                if !obj.visible {
-                    continue;
-                }
-                draw_object(frame, obj, cs_zoom, doc_x_clip, doc_y_clip);
+        // Draw objects
+        for obj in &doc.objects {
+            if !obj.visible {
+                continue;
             }
-        });
+            draw_object(&mut frame, obj, cs.zoom, doc_x, doc_y);
+        }
 
         // Selection highlight
         if let Some(sel_id) = self.selected_id {
@@ -354,25 +350,72 @@ fn draw_object(frame: &mut Frame, obj: &ObjectData, zoom: f32, pan_x: f32, pan_y
         }
         ObjectKind::Path => {
             if obj.points.len() >= 2 {
-                let path = build_path(&obj.points, zoom, pan_x, pan_y);
-                frame.fill(&path, color_from_core(&obj.fill_color));
-                frame.stroke(&path, Stroke::default().with_width(2.0 * zoom).with_color(Theme::accent()));
+                let path = build_path(&obj.points, zoom, pan_x, pan_y, obj.closed);
+                let stroke_color = color_from_core(&obj.fill_color);
+                if obj.closed {
+                    frame.fill(&path, stroke_color);
+                }
+                frame.stroke(&path, Stroke::default().with_width(2.0 * zoom).with_color(stroke_color));
             }
         }
     }
 }
 
-fn build_path(points: &[crate::core::object::PathPoint], zoom: f32, pan_x: f32, pan_y: f32) -> Path {
+fn build_path(points: &[crate::core::object::PathPoint], zoom: f32, pan_x: f32, pan_y: f32, closed: bool) -> Path {
     let mut builder = canvas::path::Builder::new();
-    if let Some(first) = points.first() {
-        builder.move_to(Point::new(first.x * zoom + pan_x, first.y * zoom + pan_y));
-        for p in points.iter().skip(1) {
-            builder.line_to(Point::new(p.x * zoom + pan_x, p.y * zoom + pan_y));
-        }
-        if points.len() > 2 {
-            builder.close();
-        }
+    if points.is_empty() {
+        return builder.build();
     }
+
+    let to_screen = |p: &crate::core::object::PathPoint| Point::new(p.x * zoom + pan_x, p.y * zoom + pan_y);
+
+    if points.len() == 1 {
+        builder.move_to(to_screen(&points[0]));
+        builder.line_to(Point::new(to_screen(&points[0]).x + 0.1, to_screen(&points[0]).y));
+        return builder.build();
+    }
+
+    if points.len() == 2 {
+        builder.move_to(to_screen(&points[0]));
+        builder.line_to(to_screen(&points[1]));
+        return builder.build();
+    }
+
+    // Catmull-Rom -> cubic Bezier conversion
+    // For points P0, P1, P2, P3, the Bezier control points are:
+    // CP1 = P1 + (P2 - P0) / 6
+    // CP2 = P2 - (P3 - P1) / 6
+    let tension = 1.0;
+
+    builder.move_to(to_screen(&points[0]));
+
+    for i in 0..points.len() - 1 {
+        let p0 = if i == 0 { &points[0] } else { &points[i - 1] };
+        let p1 = &points[i];
+        let p2 = &points[i + 1];
+        let p3 = if i + 2 < points.len() { &points[i + 2] } else { &points[i + 1] };
+
+        let s0 = to_screen(p0);
+        let s1 = to_screen(p1);
+        let s2 = to_screen(p2);
+        let s3 = to_screen(p3);
+
+        let cp1 = Point::new(
+            s1.x + (s2.x - s0.x) / 6.0 * tension,
+            s1.y + (s2.y - s0.y) / 6.0 * tension,
+        );
+        let cp2 = Point::new(
+            s2.x - (s3.x - s1.x) / 6.0 * tension,
+            s2.y - (s3.y - s1.y) / 6.0 * tension,
+        );
+
+        builder.bezier_curve_to(cp1, cp2, s2);
+    }
+
+    if closed {
+        builder.close();
+    }
+
     builder.build()
 }
 

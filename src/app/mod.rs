@@ -100,6 +100,69 @@ fn is_valid_hex(s: &str) -> bool {
     clean.len() == 6 || clean.len() == 8
 }
 
+fn simplify_path(points: &mut Vec<PathPoint>, tolerance: f32) {
+    if points.len() <= 2 {
+        return;
+    }
+    let tol_sq = tolerance * tolerance;
+    let mut keep = vec![false; points.len()];
+    keep[0] = true;
+    keep[points.len() - 1] = true;
+
+    dp_recursive(points, &mut keep, 0, points.len() - 1, tol_sq);
+
+    let mut simplified = Vec::new();
+    for (i, p) in points.iter().enumerate() {
+        if keep[i] {
+            simplified.push(p.clone());
+        }
+    }
+    *points = simplified;
+}
+
+fn dp_recursive(points: &[PathPoint], keep: &mut [bool], start: usize, end: usize, tol_sq: f32) {
+    if end - start <= 1 {
+        return;
+    }
+
+    let p1 = &points[start];
+    let p2 = &points[end];
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let len_sq = dx * dx + dy * dy;
+
+    let mut max_dist_sq = 0.0;
+    let mut max_idx = start;
+
+    for i in (start + 1)..end {
+        let p = &points[i];
+        let dist_sq = if len_sq < 1e-6 {
+            let ddx = p.x - p1.x;
+            let ddy = p.y - p1.y;
+            ddx * ddx + ddy * ddy
+        } else {
+            let t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / len_sq;
+            let t = t.clamp(0.0, 1.0);
+            let proj_x = p1.x + t * dx;
+            let proj_y = p1.y + t * dy;
+            let ddx = p.x - proj_x;
+            let ddy = p.y - proj_y;
+            ddx * ddx + ddy * ddy
+        };
+
+        if dist_sq > max_dist_sq {
+            max_dist_sq = dist_sq;
+            max_idx = i;
+        }
+    }
+
+    if max_dist_sq > tol_sq {
+        keep[max_idx] = true;
+        dp_recursive(points, keep, start, max_idx, tol_sq);
+        dp_recursive(points, keep, max_idx, end, tol_sq);
+    }
+}
+
 fn hex_to_rgb6(s: &str) -> String {
     let clean = s.trim_start_matches('#');
     if clean.len() >= 6 {
@@ -202,19 +265,38 @@ impl AppState {
         Task::none()
     }
 
-    fn export(&mut self) {
+    fn export_png(&mut self) {
         let file = rfd::FileDialog::new()
             .add_filter("PNG", &["png"])
             .set_file_name("export.png")
             .save_file();
 
         if let Some(_path) = file {
-            self.status_text = "Export not yet implemented".to_string();
+            self.status_text = "PNG export not yet implemented".to_string();
+        }
+    }
+
+    fn export_svg(&mut self) {
+        let file = rfd::FileDialog::new()
+            .add_filter("SVG", &["svg"])
+            .set_file_name("export.svg")
+            .save_file();
+
+        if let Some(path) = file {
+            let svg = crate::core::svg_export::document_to_svg(&self.document);
+            match std::fs::write(&path, svg) {
+                Ok(()) => {
+                    self.status_text = "SVG exported".to_string();
+                }
+                Err(e) => {
+                    self.status_text = format!("Export error: {}", e);
+                }
+            }
         }
     }
 
     fn set_tool(&mut self, tool: &str) {
-        if tool != "pen" && self.canvas.is_drawing_path {
+        if tool != "pencil" && tool != "pen" && self.canvas.is_drawing_path {
             self.finalize_path();
         }
         self.active_tool = tool.to_string();
@@ -326,11 +408,26 @@ impl AppState {
     fn finalize_path(&mut self) {
         if self.canvas.is_drawing_path {
             self.canvas.is_drawing_path = false;
+            let tolerance = 1.0 + self.canvas.smoothing * 10.0;
             if let Some(ref id) = self.selected_id {
-                if let Some(obj) = self.document.get_object(id) {
+                if let Some(obj) = self.document.get_object_mut(id) {
+                    simplify_path(&mut obj.points, tolerance);
                     if obj.points.len() < 2 {
                         self.document.remove_object(id);
                         self.selected_id = None;
+                    } else {
+                        let close_threshold = 15.0;
+                        if obj.points.len() > 2 {
+                            let first = &obj.points[0];
+                            let last = obj.points.last().unwrap();
+                            let dx = last.x - first.x;
+                            let dy = last.y - first.y;
+                            if (dx * dx + dy * dy).sqrt() < close_threshold {
+                                obj.closed = true;
+                                obj.points.pop();
+                            }
+                        }
+                        Self::update_path_bbox(obj);
                     }
                 }
             }
@@ -368,7 +465,7 @@ impl AppState {
                 self.canvas.create_start = (doc_x, doc_y);
                 self.canvas.create_kind = Some(kind);
             }
-            "pen" => {
+            "pencil" => {
                 if !self.canvas.is_drawing_path {
                     self.push_undo();
                     let obj = create_object_at(&mut self.document, ObjectKind::Path, doc_x, doc_y, 1.0, 1.0);
@@ -376,6 +473,19 @@ impl AppState {
                     self.canvas.is_drawing_path = true;
                 }
                 if let Some(ref id) = self.selected_id {
+                    if let Some(obj) = self.document.get_object_mut(id) {
+                        obj.points.push(PathPoint { x: doc_x, y: doc_y });
+                        Self::update_path_bbox(obj);
+                    }
+                }
+            }
+            "pen" => {
+                if !self.canvas.is_drawing_path {
+                    self.push_undo();
+                    let obj = create_object_at(&mut self.document, ObjectKind::Path, doc_x, doc_y, 1.0, 1.0);
+                    self.selected_id = Some(obj.id);
+                    self.canvas.is_drawing_path = true;
+                } else if let Some(ref id) = self.selected_id {
                     if let Some(obj) = self.document.get_object_mut(id) {
                         obj.points.push(PathPoint { x: doc_x, y: doc_y });
                         Self::update_path_bbox(obj);
@@ -397,6 +507,17 @@ impl AppState {
                     obj.transform.y = doc_y.min(sy);
                     obj.transform.width = (doc_x - sx).abs().max(1.0);
                     obj.transform.height = (doc_y - sy).abs().max(1.0);
+                }
+            }
+        } else if self.canvas.is_drawing_path && self.active_tool == "pencil" {
+            if let Some(ref id) = self.selected_id {
+                if let Some(obj) = self.document.get_object_mut(id) {
+                    let last = obj.points.last();
+                    let min_dist = 1.0 + self.canvas.smoothing * 3.0;
+                    if last.is_none_or(|p| (p.x - doc_x).abs() > min_dist || (p.y - doc_y).abs() > min_dist) {
+                        obj.points.push(PathPoint { x: doc_x, y: doc_y });
+                        Self::update_path_bbox(obj);
+                    }
                 }
             }
         } else if self.canvas.is_dragging {
@@ -421,7 +542,9 @@ impl AppState {
     }
 
     fn handle_canvas_release(&mut self, _screen_x: f32, _screen_y: f32) {
-        if self.canvas.is_creating {
+        if self.canvas.is_drawing_path && self.active_tool == "pencil" {
+            self.finalize_path();
+        } else if self.canvas.is_creating {
             if let Some(ref id) = self.selected_id {
                 if let Some(obj) = self.document.get_object(id) {
                     if obj.transform.width < 5.0 || obj.transform.height < 5.0 {
@@ -594,8 +717,11 @@ impl AppState {
                         let task = self.save_project();
                         return task;
                     }
-                    crate::ui::menu_bar::MenuBarMessage::Export => {
-                        self.export();
+                    crate::ui::menu_bar::MenuBarMessage::ExportPng => {
+                        self.export_png();
+                    }
+                    crate::ui::menu_bar::MenuBarMessage::ExportSvg => {
+                        self.export_svg();
                     }
                     crate::ui::menu_bar::MenuBarMessage::Undo => {
                         self.undo();
@@ -645,6 +771,7 @@ impl AppState {
             }
             Message::Layers(msg) => {
                 match msg {
+                    LayersMessage::LayerSelected(id) => self.select_object(&id),
                     LayersMessage::LayerDoubleClicked(id) => {
                         if self.editing_layer_id.as_ref() == Some(&id) {
                             self.editing_layer_id = None;
@@ -760,6 +887,7 @@ impl AppState {
                     StatusBarMessage::ZoomIn => self.zoom_in(),
                     StatusBarMessage::ZoomOut => self.zoom_out(),
                     StatusBarMessage::ZoomReset => self.zoom_reset(),
+                    StatusBarMessage::SmoothingChanged(val) => self.canvas.smoothing = val,
                 }
                 Task::none()
             }
@@ -794,7 +922,7 @@ impl AppState {
         let properties = crate::ui::properties::view(&self.property_data)
             .map(Message::Properties);
 
-        let status_bar = crate::ui::status_bar::view(&self.status_text, &self.doc_size, &self.zoom_text)
+        let status_bar = crate::ui::status_bar::view(&self.status_text, &self.doc_size, &self.zoom_text, self.canvas.smoothing)
             .map(Message::StatusBar);
 
         let main = row![layers, canvas, properties]

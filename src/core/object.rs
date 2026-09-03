@@ -98,6 +98,7 @@ pub struct ObjectData {
     pub font_size: f32,
     pub text_color: Color,
     pub points: Vec<PathPoint>,
+    pub closed: bool,
 }
 
 impl ObjectData {
@@ -159,6 +160,7 @@ impl ObjectData {
             font_size,
             text_color,
             points: Vec::new(),
+            closed: false,
         }
     }
 

@@ -15,7 +15,8 @@ pub enum MenuBarMessage {
     NewProject,
     OpenProject,
     SaveProject,
-    Export,
+    ExportPng,
+    ExportSvg,
     Undo,
     Redo,
 }
@@ -25,7 +26,8 @@ pub fn view(_can_undo: bool, _can_redo: bool) -> Element<'static, MenuBarMessage
         Item::new(menu_item("New Project", MenuBarMessage::NewProject)),
         Item::new(menu_item("Open Project", MenuBarMessage::OpenProject)),
         Item::new(menu_item("Save Project", MenuBarMessage::SaveProject)),
-        Item::new(menu_item("Export PNG", MenuBarMessage::Export)),
+        Item::new(menu_item("Export PNG", MenuBarMessage::ExportPng)),
+        Item::new(menu_item("Export SVG", MenuBarMessage::ExportSvg)),
     ])
     .width(180.0)
     .offset(0.0)

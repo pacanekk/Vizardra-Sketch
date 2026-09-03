@@ -15,7 +15,8 @@ pub fn view(active_tool: &str, _can_undo: bool, _can_redo: bool) -> Element<'sta
         tool_button("R", "Rectangle", active_tool == "rectangle", ToolbarMessage::ToolSelected("rectangle".into())),
         tool_button("T", "Text", active_tool == "text", ToolbarMessage::ToolSelected("text".into())),
         tool_button("I", "Image", active_tool == "image", ToolbarMessage::ToolSelected("image".into())),
-        tool_button("P", "Pen", active_tool == "pen", ToolbarMessage::ToolSelected("pen".into())),
+        tool_button("P", "Pencil", active_tool == "pencil", ToolbarMessage::ToolSelected("pencil".into())),
+        tool_button("N", "Pen", active_tool == "pen", ToolbarMessage::ToolSelected("pen".into())),
     ]
     .spacing(2)
     .padding([0, 12]);
