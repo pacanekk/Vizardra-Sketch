@@ -7,12 +7,6 @@ use crate::ui::theme::Theme;
 #[derive(Clone, Debug)]
 pub enum ToolbarMessage {
     ToolSelected(String),
-    Undo,
-    Redo,
-    NewProject,
-    OpenProject,
-    SaveProject,
-    Export,
 }
 
 pub fn view(active_tool: &str, _can_undo: bool, _can_redo: bool) -> Element<'static, ToolbarMessage> {

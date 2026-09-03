@@ -68,7 +68,7 @@ pub enum Message {
 
 pub fn run() -> Result<(), iced::Error> {
     iced::application(AppState::default, AppState::update, AppState::view)
-        .title(|_state: &AppState| String::from("Vizardra"))
+        .title(|_state: &AppState| String::from("Vizardra Sketch"))
         .theme(|_state: &AppState| Theme::Dark)
         .subscription(AppState::subscription)
         .window_size((1280.0, 800.0))
@@ -110,10 +110,6 @@ fn hex_to_rgb6(s: &str) -> String {
 }
 
 impl AppState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     fn push_undo(&mut self) {
         self.undo_stack.push(self.document.clone());
         if self.undo_stack.len() > 50 {
@@ -259,28 +255,12 @@ impl AppState {
         }
     }
 
-    fn update_fill_color(&mut self, hex: &str) {
-        if let Some(ref id) = self.selected_id {
-            if let Some(obj) = self.document.get_object_mut(id) {
-                obj.fill_color = Color::from_hex(hex);
-            }
-        }
-    }
-
     fn update_fill_color_with_opacity(&mut self, hex: &str, opacity_pct: f32) {
         if let Some(ref id) = self.selected_id {
             if let Some(obj) = self.document.get_object_mut(id) {
                 let mut color = Color::from_hex(hex);
                 color.a = ((opacity_pct / 100.0) * 255.0).round() as u8;
                 obj.fill_color = color;
-            }
-        }
-    }
-
-    fn update_text_color(&mut self, hex: &str) {
-        if let Some(ref id) = self.selected_id {
-            if let Some(obj) = self.document.get_object_mut(id) {
-                obj.text_color = Color::from_hex(hex);
             }
         }
     }
@@ -598,18 +578,6 @@ impl AppState {
             Message::Toolbar(msg) => {
                 match msg {
                     ToolbarMessage::ToolSelected(tool) => self.set_tool(&tool),
-                    ToolbarMessage::Undo => self.undo(),
-                    ToolbarMessage::Redo => self.redo(),
-                    ToolbarMessage::NewProject => self.new_project(),
-                    ToolbarMessage::OpenProject => {
-                        let task = self.open_project();
-                        return task;
-                    }
-                    ToolbarMessage::SaveProject => {
-                        let task = self.save_project();
-                        return task;
-                    }
-                    ToolbarMessage::Export => self.export(),
                 }
                 Task::none()
             }
@@ -677,7 +645,6 @@ impl AppState {
             }
             Message::Layers(msg) => {
                 match msg {
-                    LayersMessage::LayerSelected(id) => self.select_object(&id),
                     LayersMessage::LayerDoubleClicked(id) => {
                         if self.editing_layer_id.as_ref() == Some(&id) {
                             self.editing_layer_id = None;
@@ -798,10 +765,8 @@ impl AppState {
             }
             Message::WindowResized(size) => {
                 self.window_size = (size.width, size.height);
-                if self.needs_fit {
-                    self.fit_to_screen(size.width, size.height);
-                    self.needs_fit = false;
-                }
+                self.fit_to_screen(size.width, size.height);
+                self.needs_fit = false;
                 Task::none()
             }
         }

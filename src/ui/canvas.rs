@@ -247,13 +247,19 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
             Stroke::default().with_width(1.0).with_color(Theme::doc_border()),
         );
 
-        // Draw objects (manual transform — multiply by zoom and add pan)
-        for obj in &doc.objects {
-            if !obj.visible {
-                continue;
+        // Draw objects (clipped to document area)
+        let doc_bounds = Rectangle::new(Point::new(doc_x, doc_y), Size::new(doc_w, doc_h));
+        let cs_zoom = cs.zoom;
+        let doc_x_clip = doc_x;
+        let doc_y_clip = doc_y;
+        frame.with_clip(doc_bounds, |frame| {
+            for obj in &doc.objects {
+                if !obj.visible {
+                    continue;
+                }
+                draw_object(frame, obj, cs_zoom, doc_x_clip, doc_y_clip);
             }
-            draw_object(&mut frame, obj, cs.zoom, doc_x, doc_y);
-        }
+        });
 
         // Selection highlight
         if let Some(sel_id) = self.selected_id {

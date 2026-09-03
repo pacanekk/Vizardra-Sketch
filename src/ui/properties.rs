@@ -73,11 +73,6 @@ impl Default for PropertyData {
     }
 }
 
-fn is_valid_hex(s: &str) -> bool {
-    let clean = s.trim_start_matches('#');
-    clean.len() == 6 || clean.len() == 8
-}
-
 fn hex_to_rgb6(s: &str) -> String {
     let clean = s.trim_start_matches('#');
     if clean.len() >= 6 {
@@ -85,20 +80,6 @@ fn hex_to_rgb6(s: &str) -> String {
     } else {
         s.to_string()
     }
-}
-
-fn hex_alpha_to_opacity(s: &str) -> Option<f32> {
-    let clean = s.trim_start_matches('#');
-    if clean.len() == 8 {
-        let a = u8::from_str_radix(&clean[6..8], 16).ok()?;
-        Some((a as f32 / 255.0) * 100.0)
-    } else {
-        None
-    }
-}
-
-fn opacity_to_hex_alpha(opacity_pct: f32) -> u8 {
-    ((opacity_pct / 100.0) * 255.0).round() as u8
 }
 
 impl PropertyData {
@@ -176,16 +157,16 @@ pub fn view(prop: &PropertyData) -> Element<'_, PropertiesMessage> {
         column![
             text("Transform").size(10).color(Theme::text_tertiary()),
             row![
-                field_input("X", &prop.x_str),
-                field_input("Y", &prop.y_str),
+                field_input("X", &prop.x_str, PropertiesMessage::XChanged),
+                field_input("Y", &prop.y_str, PropertiesMessage::YChanged),
             ].spacing(8),
             row![
-                field_input("W", &prop.width_str),
-                field_input("H", &prop.height_str),
+                field_input("W", &prop.width_str, PropertiesMessage::WidthChanged),
+                field_input("H", &prop.height_str, PropertiesMessage::HeightChanged),
             ].spacing(8),
             row![
-                field_input("R°", &prop.rotation_str),
-                field_input("O", &prop.opacity_str),
+                field_input("R°", &prop.rotation_str, PropertiesMessage::RotationChanged),
+                field_input("O", &prop.opacity_str, PropertiesMessage::OpacityChanged),
             ].spacing(8),
         ]
         .spacing(4)
@@ -258,11 +239,16 @@ pub fn view(prop: &PropertyData) -> Element<'_, PropertiesMessage> {
         .into()
 }
 
-fn field_input<'a>(label: &'a str, value: &'a str) -> Element<'a, PropertiesMessage> {
+fn field_input<'a>(
+    label: &'a str,
+    value: &'a str,
+    on_input: impl Fn(String) -> PropertiesMessage + 'a,
+) -> Element<'a, PropertiesMessage> {
     row![
         text(label.to_string()).size(10).color(Theme::text_tertiary()).width(24),
         text_input("", value)
             .size(11)
+            .on_input(on_input)
             .style(input_style),
     ]
     .spacing(4)

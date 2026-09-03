@@ -3,16 +3,8 @@ use iced::Color;
 pub struct Theme;
 
 impl Theme {
-    pub fn bg_app() -> Color {
-        Color::from_rgb(0.10, 0.10, 0.11)
-    }
-
     pub fn bg_panel() -> Color {
         Color::from_rgb(0.125, 0.125, 0.133)
-    }
-
-    pub fn bg_panel_alt() -> Color {
-        Color::from_rgb(0.149, 0.149, 0.16)
     }
 
     pub fn bg_elevated() -> Color {
@@ -39,10 +31,6 @@ impl Theme {
         Color::from_rgb(0.18, 0.18, 0.196)
     }
 
-    pub fn border_default() -> Color {
-        Color::from_rgb(0.227, 0.227, 0.243)
-    }
-
     pub fn text_primary() -> Color {
         Color::from_rgb(0.91, 0.91, 0.918)
     }
@@ -65,14 +53,6 @@ impl Theme {
 
     pub fn selection() -> Color {
         Color::from_rgb(0.357, 0.486, 0.98)
-    }
-
-    pub fn danger() -> Color {
-        Color::from_rgb(0.878, 0.333, 0.333)
-    }
-
-    pub fn success() -> Color {
-        Color::from_rgb(0.361, 0.722, 0.361)
     }
 
     pub fn doc_bg() -> Color {

@@ -7,7 +7,6 @@ use crate::ui::theme::Theme;
 
 #[derive(Clone, Debug)]
 pub enum LayersMessage {
-    LayerSelected(String),
     LayerDoubleClicked(String),
     LayerNameChanged(String, String),
     LayerNameSubmitted,
