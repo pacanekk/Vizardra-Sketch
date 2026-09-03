@@ -1,0 +1,16 @@
+[package]
+name = "vizardra"
+version = "0.1.0"
+edition = "2021"
+description = "A premium creative playground for visual creation"
+
+[dependencies]
+iced = { version = "0.13", features = ["canvas", "advanced", "tokio", "svg"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rfd = "0.14"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
