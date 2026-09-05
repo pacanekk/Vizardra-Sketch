@@ -12,10 +12,11 @@ pub enum ToolbarMessage {
 pub fn view(active_tool: &str, _can_undo: bool, _can_redo: bool) -> Element<'static, ToolbarMessage> {
     let tools = row![
         tool_button_svg("assets/icons/select.svg", "Select", active_tool == "select", ToolbarMessage::ToolSelected("select".into())),
+        tool_button("A", "Node", active_tool == "node", ToolbarMessage::ToolSelected("node".into())),
         tool_button("R", "Rectangle", active_tool == "rectangle", ToolbarMessage::ToolSelected("rectangle".into())),
         tool_button("T", "Text", active_tool == "text", ToolbarMessage::ToolSelected("text".into())),
         tool_button("I", "Image", active_tool == "image", ToolbarMessage::ToolSelected("image".into())),
-        tool_button("P", "Pencil", active_tool == "pencil", ToolbarMessage::ToolSelected("pencil".into())),
+        tool_button("P", "Draw", active_tool == "draw", ToolbarMessage::ToolSelected("draw".into())),
         tool_button("N", "Pen", active_tool == "pen", ToolbarMessage::ToolSelected("pen".into())),
     ]
     .spacing(2)

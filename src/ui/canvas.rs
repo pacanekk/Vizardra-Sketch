@@ -39,6 +39,8 @@ pub struct CanvasState {
     pub is_drawing_path: bool,
     pub drag_points_start: Vec<crate::core::object::PathPoint>,
     pub smoothing: f32,
+    pub temp_draw_points: Vec<crate::core::object::PathPoint>,
+    pub dragging_node: Option<usize>,
 }
 
 impl Default for CanvasState {
@@ -59,6 +61,8 @@ impl Default for CanvasState {
             is_drawing_path: false,
             drag_points_start: Vec::new(),
             smoothing: 0.5,
+            temp_draw_points: Vec::new(),
+            dragging_node: None,
         }
     }
 }
@@ -269,8 +273,74 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
                         &Path::rectangle(Point::new(sx - 1.0, sy - 1.0), Size::new(sw + 2.0, sh + 2.0)),
                         Stroke::default().with_width(1.5).with_color(Theme::selection()),
                     );
+
+                    if obj.kind == ObjectKind::Path && (self.active_tool == "node" || self.active_tool == "pen") {
+                        for p in &obj.points {
+                            let px = p.x * cs.zoom + doc_x;
+                            let py = p.y * cs.zoom + doc_y;
+                            let node_size = 6.0;
+                            frame.fill(
+                                &Path::rectangle(
+                                    Point::new(px - node_size / 2.0, py - node_size / 2.0),
+                                    Size::new(node_size, node_size),
+                                ),
+                                Color::WHITE,
+                            );
+                            frame.stroke(
+                                &Path::rectangle(
+                                    Point::new(px - node_size / 2.0, py - node_size / 2.0),
+                                    Size::new(node_size, node_size),
+                                ),
+                                Stroke::default().with_width(1.5).with_color(Theme::accent()),
+                            );
+                        }
+                    }
                 }
             }
+        }
+
+        // Draw preview for active draw stroke
+        if self.canvas_state.is_drawing_path && !self.canvas_state.temp_draw_points.is_empty() {
+            let pts = &self.canvas_state.temp_draw_points;
+            let zoom = cs.zoom;
+            if pts.len() >= 2 {
+                let preview_path = build_path(pts, zoom, doc_x, doc_y, false);
+                frame.stroke(
+                    &preview_path,
+                    Stroke::default()
+                        .with_width(2.0 * zoom)
+                        .with_color(Theme::accent()),
+                );
+            }
+        }
+
+        // Re-draw document border on top
+        frame.stroke(
+            &Path::rectangle(Point::new(doc_x, doc_y), Size::new(doc_w, doc_h)),
+            Stroke::default().with_width(1.0).with_color(Theme::doc_border()),
+        );
+
+        // Cover area outside document with canvas background (masks overflow)
+        let bw = bounds.size().width;
+        let bh = bounds.size().height;
+        let bg = Theme::bg_canvas();
+        // Top strip
+        if doc_y > 0.0 {
+            frame.fill_rectangle(Point::ORIGIN, Size::new(bw, doc_y), bg);
+        }
+        // Bottom strip
+        let bottom_y = doc_y + doc_h;
+        if bottom_y < bh {
+            frame.fill_rectangle(Point::new(0.0, bottom_y), Size::new(bw, bh - bottom_y), bg);
+        }
+        // Left strip
+        if doc_x > 0.0 {
+            frame.fill_rectangle(Point::ORIGIN, Size::new(doc_x, doc_h), bg);
+        }
+        // Right strip
+        let right_x = doc_x + doc_w;
+        if right_x < bw {
+            frame.fill_rectangle(Point::new(right_x, doc_y), Size::new(bw - right_x, doc_h), bg);
         }
 
         vec![frame.into_geometry()]
@@ -286,7 +356,7 @@ impl<'a> canvas::Program<CanvasEvent> for CanvasProgram<'a> {
             return mouse::Interaction::Grabbing;
         }
         match self.active_tool {
-            "select" => {
+            "select" | "node" => {
                 if cursor.position_in(bounds).is_some() {
                     mouse::Interaction::Pointer
                 } else {
